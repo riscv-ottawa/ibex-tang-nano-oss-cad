@@ -1,0 +1,76 @@
+diff --git a/litex/build/yosys_wrapper.py b/litex/build/yosys_wrapper.py
+index e8ccb38cd..8f8f8b615 100644
+--- a/litex/build/yosys_wrapper.py
++++ b/litex/build/yosys_wrapper.py
+@@ -76,15 +76,32 @@ class YosysWrapper():
+         """
+         includes = ""
+         reads = []
++        sv_files = []
++        # Opt-in: route SystemVerilog through the yosys-slang plugin instead of
++        # the built-in read_verilog -sv frontend. Off by default, so existing
++        # builds are byte-for-byte unchanged and never require the plugin. A core
++        # sets platform.use_slang = True when its SystemVerilog needs a full
++        # elaborator that read_verilog -sv cannot parse (e.g. lowRISC Ibex).
+         for path in self._platform.verilog_include_paths:
+             includes += " -I" + path
+         for filename, language, library, *copy in self._platform.sources:
+             # yosys has no such function read_systemverilog
+             if language == "systemverilog":
++                if getattr(self._platform, "use_slang", False):
++                    sv_files.append(filename)
++                    continue
+                 language = "verilog -sv"
+             if language is None:
+                 continue
+             reads.append(f'read_{language}{includes} "{filename}"')
++        if sv_files:
++            files = " ".join(sv_files)
++            # Per-design slang options (e.g. a top-level parameter override or
++            # --ignore-initial); set by the enabling core, empty otherwise.
++            extra = getattr(self._platform, "slang_extra", "")
++            extra = f" {extra}" if extra else ""
++            reads.insert(0, "plugin -i slang")
++            reads.append(f"read_slang --ignore-unknown-modules{extra}{includes} {files}")
+         return "\n".join(reads)
+
+     _default_template = [
+diff --git a/litex/soc/cores/cpu/ibex/core.py b/litex/soc/cores/cpu/ibex/core.py
+index 4db89a227..9387b8840 100644
+--- a/litex/soc/cores/cpu/ibex/core.py
++++ b/litex/soc/cores/cpu/ibex/core.py
+@@ -263,7 +263,8 @@ class Ibex(CPU):
+
+         platform.add_sources(os.path.join(ibexdir, "vendor", "lowrisc_ip", "ip", "prim_generic", "rtl"),
+             "prim_generic_ram_1p.sv",
+-            "prim_generic_buf.sv"
++            "prim_generic_buf.sv",
++            "prim_generic_flop.sv"
+         )
+
+         rtl_base = os.path.join(ibexdir, "rtl")
+@@ -277,9 +278,25 @@ class Ibex(CPU):
+         platform.add_sources(rtl_base,
+             "ibex_wb_stage.sv",
+             "ibex_csr.sv",
++            "ibex_register_file_fpga.sv",
+             "ibex_top.sv"
+             )
+-        platform.add_source(os.path.join(ibexdir, "dv", "uvm", "core_ibex", "common", "prim", "prim_buf.sv"))
++        # Build under the yosys-slang SystemVerilog frontend (opt-in; see
++        # litex/build/yosys_wrapper.py). read_verilog -sv cannot parse these
++        # lowRISC sources. slang is a full elaborator, so it also needs the prim
++        # sources it would otherwise miss.
++        #
++        # Use the FPGA (distributed-RAM) register file instead of the default
++        # flip-flop one, which overflows small parts (GW1NR-9: 9211/8640 LUT4 =
++        # 106%); the distributed-RAM file drops the SoC to ~80% on GW1NR-9.
++        platform.use_slang = True
++        platform.slang_extra = "--relax-enum-conversions --ignore-initial --top ibex_top -G RegFile=1"
++        platform.add_sources(os.path.join(ibexdir, "dv", "uvm", "core_ibex", "common", "prim"),
++            "prim_buf.sv",
++            "prim_flop.sv"
++        )
+     def set_reset_address(self, reset_address):
+         self.reset_address = reset_address
+         self.cpu_params.update(i_boot_addr_i=Signal(32, reset=reset_address))

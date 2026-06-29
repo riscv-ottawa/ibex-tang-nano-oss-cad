@@ -1,0 +1,20 @@
+# LiteX build output (gateware, bios, generated headers)
+/build/
+
+# Build transcript (from the README's `tee build.log`)
+/build.log
+
+# Fetched automatically by the sipeed_tang_nano_9k target on first build
+/hyperbus.py
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+manuals/
+upstream/
+BRINGUP.md
+FLASHING.md
+PLAN.md
+.claude
+

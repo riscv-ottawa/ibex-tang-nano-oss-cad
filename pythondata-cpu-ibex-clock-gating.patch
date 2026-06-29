@@ -1,0 +1,33 @@
+diff --git a/pythondata_cpu_ibex/system_verilog/syn/rtl/prim_clock_gating.v b/pythondata_cpu_ibex/system_verilog/syn/rtl/prim_clock_gating.v
+index 14d19745..6ad5d682 100644
+--- a/pythondata_cpu_ibex/system_verilog/syn/rtl/prim_clock_gating.v
++++ b/pythondata_cpu_ibex/system_verilog/syn/rtl/prim_clock_gating.v
+@@ -2,7 +2,11 @@
+ // Licensed under the Apache License, Version 2.0, see LICENSE for details.
+ // SPDX-License-Identifier: Apache-2.0
+ 
+-// Example clock gating module for yosys synthesis
++// Pass-through clock gating for FPGA flows without a clock-gating primitive.
++// The latch-based gate (en_latch & clk_i) does not route onto Gowin's global
++// clock network through nextpnr-himbaechel, leaving the Ibex core unclocked.
++// Disabling the gate keeps the core permanently clocked (no low-power sleep),
++// which is correct functionally; only the power-saving optimisation is lost.
+ 
+ module prim_clock_gating (
+   input  clk_i,
+@@ -11,13 +15,7 @@ module prim_clock_gating (
+   output clk_o
+ );
+ 
+-  reg en_latch;
+-
+-  always @* begin
+-    if (!clk_i) begin
+-      en_latch = en_i | test_en_i;
+-    end
+-  end
+-  assign clk_o = en_latch & clk_i;
++  wire unused = en_i | test_en_i;
++  assign clk_o = clk_i;
+ 
+ endmodule
