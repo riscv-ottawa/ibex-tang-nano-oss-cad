@@ -17,14 +17,6 @@ Everything else (the open FPGA toolchain, RISC-V GCC, LiteX) is in the container
 podman build -t tn9k-ibex .
 ```
 
-The build pulls the newest OSS CAD Suite release on its own. To pin an exact
-version for reproducibility, pass the asset URL from
-<https://github.com/YosysHQ/oss-cad-suite-build/releases>:
-
-```bash
-podman build -t tn9k-ibex .
-```
-
 ## 2. Start the container
 
 Run it detached with your project mounted at `/work`. Build artifacts land in

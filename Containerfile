@@ -51,30 +51,40 @@ RUN set -eux; \
     rm /tmp/oss-cad-suite.tgz; \
     yosys --version && nextpnr-himbaechel --version && openFPGALoader --Version
 
-# LiteX + CPU cores (full config pulls in ibex) into an isolated venv.
-# LITEX_REF pins the litex repo to a known-good master commit. We depend on the
-# upstreamed Ibex crt0 reset-vector fix (9b02b8e53) and the current-Ibex wrapper
-# integration (4b97f01), so floating on master is not safe; bump this to re-pull.
-ARG LITEX_REF=0806fefd2
+# LiteX + CPU cores (full config pulls in ibex) into an isolated venv. Floats on
+# whatever litex_setup checks out, i.e. the latest master of each repo. The Ibex
+# crt0 reset-vector fix and the current-Ibex wrapper integration are upstream, so
+# master builds as-is; the patches below are the only local deltas.
 RUN python3 -m venv /opt/litex-venv \
     && mkdir -p /opt/litex && cd /opt/litex \
     && wget -q https://raw.githubusercontent.com/enjoy-digital/litex/master/litex_setup.py \
     && python3 litex_setup.py --init --install --config=full \
-    && git -C litex fetch --depth=300 origin master \
-    && git -C litex checkout "${LITEX_REF}" \
     && rm -rf /root/.cache/pip
 
-# Make the Ibex build under the open (apicula) flow. This patch (1) routes the
+# Define the C init-array boundary symbols in the BIOS linker script. Current
+# litex master calls the generic init-array helper from startup.c
+# (litex_startup_init), but bios/linker.ld never defined
+# __preinit_array_start/__init_array_start/etc, so bios.elf fails to link. Add
+# an .init_array section (empty in practice, the BIOS has no static ctors).
+COPY litex-bios-init-array.patch /tmp/litex-bios-init-array.patch
+RUN cd /opt/litex/litex && git apply --verbose /tmp/litex-bios-init-array.patch \
+    && rm /tmp/litex-bios-init-array.patch
+
+# Make the Ibex build under the open (apicula) flow. This patch routes the
 # lowRISC Ibex SystemVerilog through the yosys-slang frontend (stock read_verilog
-# -sv cannot parse it) and adds the prim sources slang needs as a full elaborator,
-# and (2) selects the small distributed-RAM register file (the default flip-flop
-# file overflows the GW1NR-9 LUTs at 106%). Two earlier fixes are gone: the crt0
-# reset-vector layout is now upstream (litex 9b02b8e53), and the BIOS UART no
-# longer needs forcing to polling (interrupt-driven UART boots cleanly on the
-# current Ibex integration). See README.md for the full story.
+# -sv cannot parse it) and adds the prim sources slang needs as a full elaborator.
+# The register file defaults to Ibex's portable flip-flop file and is switchable
+# per board via platform.ibex_regfile; the litex-boards patch below opts the Tang
+# Nano 9K into the distributed-RAM file. See README.md for the full story.
 COPY litex-ibex-apicula.patch /tmp/litex-ibex-apicula.patch
 RUN cd /opt/litex/litex && git apply --verbose /tmp/litex-ibex-apicula.patch \
     && rm /tmp/litex-ibex-apicula.patch
+
+# Opt the Tang Nano 9K target into the distributed-RAM register file so the SoC
+# fits the GW1NR-9; the default flip-flop file overflows its LUTs (106%).
+COPY litex-boards-tang-nano-regfile.patch /tmp/litex-boards-tang-nano-regfile.patch
+RUN cd /opt/litex/litex-boards && git apply --verbose /tmp/litex-boards-tang-nano-regfile.patch \
+    && rm /tmp/litex-boards-tang-nano-regfile.patch
 
 # Replace the lowRISC Ibex clock-gating cell with a pass-through. The latch-based
 # gate does not route onto Gowin's global clock network through
