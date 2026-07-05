@@ -167,3 +167,25 @@ offset 0x80, because the Ibex hardware reset vector is `boot_addr + 0x80`. A
 serial-booted program is different: the BIOS jumps straight to the load address
 (main RAM base), so the entry point has to be at offset 0. The local crt0 puts
 `_start` there, which is all a polling, interrupt-free program needs.
+
+## Tools and resources
+
+The build framework and SoC generator:
+
+- [LiteX](https://github.com/enjoy-digital/litex): SoC builder that generates the gateware, bus, and BIOS; installed via its `litex_setup.py`.
+- [litex-boards](https://github.com/litex-hub/litex-boards): board targets, including `sipeed_tang_nano_9k` used here.
+- [pythondata-cpu-ibex](https://github.com/litex-hub/pythondata-cpu-ibex): LiteX packaging of the Ibex RTL; a data-only wrapper LiteX reads the SystemVerilog from.
+- [lowRISC Ibex](https://github.com/lowRISC/ibex): the RISC-V CPU core itself, vendored into pythondata-cpu-ibex.
+
+The open FPGA toolchain (which is all already in the [OSS CAD Suite](https://github.com/YosysHQ/oss-cad-suite-build) container):
+
+- [yosys](https://github.com/YosysHQ/yosys): synthesis (RTL to gate-level netlist).
+- [yosys-slang](https://github.com/povik/yosys-slang): SystemVerilog frontend plugin for yosys; needed to parse the lowRISC Ibex sources.
+- [nextpnr-himbaechel](https://github.com/YosysHQ/nextpnr): place and route for the Gowin GW1NR-9.
+- [apicula](https://github.com/YosysHQ/apicula): Gowin bitstream tooling (`gowin_pack`).
+- [openFPGALoader](https://github.com/trabucayre/openFPGALoader): flashes the bitstream and BIOS over JTAG.
+
+Toolchain and hardware:
+
+- [riscv64-unknown-elf GCC](https://packages.ubuntu.com/gcc-riscv64-unknown-elf): cross-compiler for the BIOS and bare-metal [app](./app).
+- [Sipeed Tang Nano 9K](https://wiki.sipeed.com/hardware/en/tang/Tang-Nano-9K/Nano-9K.html): the target board (Gowin GW1NR-9 FPGA).
