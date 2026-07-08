@@ -1,0 +1,48 @@
+diff --git a/litex/build/yosys_wrapper.py b/litex/build/yosys_wrapper.py
+index 24fe78893..a74b05bb9 100644
+--- a/litex/build/yosys_wrapper.py
++++ b/litex/build/yosys_wrapper.py
+@@ -89,17 +89,17 @@ class YosysWrapper():
+             includes += " -I" + path
+         for filename, language, library, *copy in self._platform.sources:
+             # yosys has no such function read_systemverilog
++            if self._use_slang and (language == "systemverilog" or library == "slang"):
++                slang_files.append(filename)
++                continue
+             if language == "systemverilog":
+-                if self._use_slang:
+-                    slang_files.append(filename)
+-                    continue
+                 language = "verilog -sv"
+             if language is None:
+                 continue
+             reads.append(f'read_{language}{includes} "{filename}"')
+         if slang_files:
+             opts  = f" {self._slang_opts}" if self._slang_opts else ""
+-            files = " ".join(f'"{filename}"' for filename in slang_files)
++            files = " ".join(slang_files)
+             reads.insert(0, "plugin -i slang")
+             reads.append(f"read_slang{opts}{includes} {files}")
+         return "\n".join(reads)
+diff --git a/litex/soc/cores/cpu/ibex/core.py b/litex/soc/cores/cpu/ibex/core.py
+index 836f57dc5..a0f581bb7 100644
+--- a/litex/soc/cores/cpu/ibex/core.py
++++ b/litex/soc/cores/cpu/ibex/core.py
+@@ -220,7 +220,7 @@ class Ibex(CPU):
+         platform.add_verilog_include_path(os.path.join(ibexdir,
+             "dv", "uvm", "core_ibex", "common", "prim")
+         )
+-        platform.add_source(os.path.join(ibexdir, "syn", "rtl", "prim_clock_gating.v"))
++        platform.add_source(os.path.join(ibexdir, "syn", "rtl", "prim_clock_gating.v"), library="slang")
+         platform.add_sources(os.path.join(ibexdir, "vendor", "lowrisc_ip", "ip", "prim", "rtl"),
+             "prim_util_pkg.sv",
+             "prim_count_pkg.sv",
+@@ -297,7 +297,7 @@ class Ibex(CPU):
+             platform.add_source(os.path.join(rtl_base, "ibex_register_file_fpga.sv"))
+ 
+         platform.yosys_use_slang  = True
+-        platform.yosys_slang_opts = "--ignore-unknown-modules --relax-enum-conversions --ignore-initial --top ibex_top -G RegFile={}".format(
++        platform.yosys_slang_opts = "--relax-enum-conversions --ignore-initial --top ibex_top -G RegFile={}".format(
+             regfiles[regfile])
+ 
+     def set_reset_address(self, reset_address):
