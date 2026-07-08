@@ -34,6 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         meson ninja-build \
         libevent-dev libjson-c-dev \
         gcc-riscv64-unknown-elf \
+        clangd \
     && rm -rf /var/lib/apt/lists/*
 
 # Open FPGA flow, downloaded at build time. OSS CAD Suite binaries are relocatable

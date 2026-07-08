@@ -1,0 +1,21 @@
+{
+    // Opens this project inside the same toolchain container the Makefile uses.
+    // If using Zed with Podman, set "use_podman": true in your Zed settings.json first.
+    "name": "tn9k-ibex",
+    // Build context is the repo root ("..") because the Containerfile COPYs the
+    // litex-*.patch files that live there.
+    "build": {
+        "dockerfile": "../Containerfile",
+        "context": ".."
+    },
+    "workspaceFolder": "/work",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/work,type=bind",
+    // keep-groups passes the host user's supplementary GIDs (numerically, outside
+    // the userns map) into the container, so the container process keeps its
+    // plugdev membership and can open the Tang Nano's FT2232 nodes (both the raw
+    // USB node for flashing and /dev/ttyUSB* for the serial console), which are
+    // group plugdev with rw. This avoids needing the host-side udev 0666 rule.
+    // Podman-specific keyword; requires the host user to be in the plugdev group.
+    "runArgs": ["--name=${localWorkspaceFolderBasename}", "--privileged", "--hostname=ibex", "--group-add=keep-groups"],
+    "overrideCommand": true
+}

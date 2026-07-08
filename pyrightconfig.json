@@ -1,0 +1,6 @@
+{
+  "//": "Point pyright at the container's LiteX venv so imports of litex,",
+  "//2": "litex_boards, and migen (used by tn9k_ibex.py) resolve and navigate.",
+  "venvPath": "/opt",
+  "venv": "litex-venv"
+}

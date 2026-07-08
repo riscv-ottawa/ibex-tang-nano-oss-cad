@@ -10,12 +10,15 @@
 # hardware reset vector is boot_addr+0x80). Reusing that crt0 here would land
 # the CPU in the trap table instead of the reset entry.
 #
-# The app polls the UART and never enables interrupts, so no vector table is
-# needed. mtvec points at a hang loop so an unexpected trap stops visibly
-# rather than silently resetting.
+# The BIOS runs with interrupts enabled and jumps straight here without
+# clearing them, so we clear mstatus.MIE first. libbase's interrupt-driven
+# uart.c unmasks the UART interrupt in uart_init(); left with MIE set, the
+# first UART event would vector into the hang loop above. With MIE off, uart.c
+# falls back to pumping uart_isr() by hand, which is all this app needs.
 
 .section .text
 _start:
+  csrci mstatus, 8        # clear mstatus.MIE: run with interrupts globally off
   la sp, _fstack
   la t0, trap
   csrw mtvec, t0          # direct mode, mode bits clear

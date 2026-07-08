@@ -1,0 +1,25 @@
+{
+  "lsp": {
+    "clangd": {
+      // Use the container's clangd and let it query the RISC-V GCC for its
+      // system headers and target defines (cross-compilation navigation).
+      "binary": {
+        "path": "clangd",
+        "arguments": [
+          "--query-driver=/usr/bin/riscv64-unknown-elf-*",
+          "--background-index",
+          "--header-insertion=never"
+        ]
+      }
+    },
+    "pyright": {
+      // Resolve litex / litex_boards / migen from the container's venv so
+      // go-to-definition reaches the LiteX sources.
+      "settings": {
+        "python": {
+          "pythonPath": "/opt/litex-venv/bin/python"
+        }
+      }
+    }
+  }
+}
