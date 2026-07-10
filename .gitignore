@@ -13,8 +13,4 @@ __pycache__/
 
 manuals/
 upstream/
-BRINGUP.md
-FLASHING.md
-PLAN.md
-.claude
-
+docs/

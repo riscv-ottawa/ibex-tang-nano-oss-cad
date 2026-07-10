@@ -1,0 +1,26 @@
+# clangd configuration for the bare-metal firmware in apps/.
+#
+# The headers the firmware includes live inside the container, so this is meant
+# to be used from the dev container (.devcontainer/). Run `make soc` once so the
+# generated headers under build/ exist, otherwise <generated/csr.h> and friends
+# will not resolve.
+#
+# --march/--mabi are normalised to clang-friendly spellings; combined with the
+# --query-driver argument in .zed/settings.json, clangd also picks up the GCC
+# toolchain's own system headers and target defines.
+CompileFlags:
+  Compiler: riscv64-unknown-elf-gcc
+  Add:
+    - "--target=riscv32-unknown-elf"
+    - "-march=rv32imc"
+    - "-mabi=ilp32"
+    - "-D__ibex__"
+    # LiteX + picolibc headers (from the container image).
+    - "-I/opt/litex/pythondata-software-picolibc/pythondata_software_picolibc/data/libc/include"
+    - "-I/opt/litex/litex/litex/soc/software/libbase"
+    - "-I/opt/litex/litex/litex/soc/software/include"
+    - "-I/opt/litex/litex/litex/soc/software"
+    - "-I/opt/litex/litex/litex/soc/cores/cpu/ibex"
+    # Generated SoC headers (created by `make soc`).
+    - "-I/work/build/sipeed_tang_nano_9k/software/include"
+    - "-I/work/build/sipeed_tang_nano_9k/software/libc"
