@@ -98,9 +98,6 @@ flash-app: app ## Flash APP to SPI flash at APP_FLASH_OFFSET (for flash-boot)
 	$(EXEC) 'cd /work && openFPGALoader -b $(BOARD) --external-flash \
 		-o $(APP_FLASH_OFFSET) build/apps/$(APP)/$(APP).fbi'
 
-blink: ## Build + flash the external-LED blink app (runs on reset)
-	$(MAKE) flash-app APP=blink
-
 reset: ## Reload the board from flash
 	$(EXEC) 'openFPGALoader -b $(BOARD) -r'
 

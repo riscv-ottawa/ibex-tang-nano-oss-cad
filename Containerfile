@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         meson ninja-build \
         libevent-dev libjson-c-dev \
         gcc-riscv64-unknown-elf \
-        clangd \
+        clangd neovim less \
     && rm -rf /var/lib/apt/lists/*
 
 # Open FPGA flow, downloaded at build time. OSS CAD Suite binaries are relocatable
@@ -72,26 +72,6 @@ RUN python3 -m venv /opt/litex-venv \
 RUN cd /opt/litex/litex \
     && git fetch origin fix-yosys-slang-ibex \
     && git checkout fix-yosys-slang-ibex
-
-# Two fixes the PR still needs to build against the yosys-slang in the current OSS
-# CAD Suite. (1) The wrapper quotes read_slang filenames, but slang (unlike
-# read_verilog) does not strip yosys quotes, so every source is "No such file";
-# pass bare filenames. (2) The Ibex core passes --ignore-unknown-modules, removed
-# from yosys-slang (rev 3774661), to keep prim_clock_gating.v off the slang path;
-# instead route that plain-Verilog cell into read_slang via a "slang" library tag
-# and drop the flag. Reported on the PR; drop this once merged upstream.
-COPY litex-pr2510-yosys-slang-fixes.patch /tmp/litex-pr2510-yosys-slang-fixes.patch
-RUN cd /opt/litex/litex && git apply --verbose /tmp/litex-pr2510-yosys-slang-fixes.patch \
-    && rm /tmp/litex-pr2510-yosys-slang-fixes.patch
-
-# Define the C init-array boundary symbols in the BIOS linker script. Current
-# litex master calls the generic init-array helper from startup.c
-# (litex_startup_init), but bios/linker.ld never defined
-# __preinit_array_start/__init_array_start/etc, so bios.elf fails to link. Add
-# an .init_array section (empty in practice, the BIOS has no static ctors).
-COPY litex-bios-init-array.patch /tmp/litex-bios-init-array.patch
-RUN cd /opt/litex/litex && git apply --verbose /tmp/litex-bios-init-array.patch \
-    && rm /tmp/litex-bios-init-array.patch
 
 # Opt the Tang Nano 9K target into the distributed-RAM register file so the SoC
 # fits the GW1NR-9; the default flip-flop file overflows its LUTs (106%).
