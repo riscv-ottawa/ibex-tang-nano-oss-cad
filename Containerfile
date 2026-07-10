@@ -7,10 +7,10 @@
 #   - LiteX (+ ibex core) installed into a venv, with litex_term / litex_bare_metal_demo
 #
 # BUILD:
-#   podman build -t tn9k-ibex -f Containerfile .
+#   podman build -t ibex-tang-nano-oss-cad-f Containerfile .
 #
 # RUN:
-# podman run -dit --privileged --name tn9k-ibex -v "$PWD":/work tn9k-ibex
+# podman run -dit --privileged --name ibex-tang-nano-oss-cad-v "$PWD":/work ibex-tang-nano-oss-cad
 
 # By default the newest OSS CAD Suite linux-x64 release is resolved and downloaded.
 # Pin a specific build for reproducibility with:
