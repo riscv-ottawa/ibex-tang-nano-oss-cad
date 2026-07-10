@@ -1,7 +1,7 @@
 {
     // Opens this project inside the same toolchain container the Makefile uses.
     // If using Zed with Podman, set "use_podman": true in your Zed settings.json first.
-    "name": "tn9k-ibex",
+    "name": "${localWorkspaceFolderBasename}",
     // Build context is the repo root ("..") because the Containerfile COPYs the
     // litex-*.patch files that live there.
     "build": {

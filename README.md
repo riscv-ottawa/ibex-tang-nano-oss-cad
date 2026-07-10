@@ -31,34 +31,10 @@ make run APP=echo     # or serial-boot the UART echo + on-board-LED app
 for example `make run APP=echo TTY=/dev/ttyUSB1` or `make soc SYS_CLK_FREQ=13.5e6`;
 the defaults live at the top of the `Makefile`.
 
-## Editor setup: code completion and navigation (Zed)
-
-The toolchain and every header and Python package live in the container, so the
-smoothest way to get full completion and go-to-definition (including into the
-included libraries) is to let Zed open the project inside the dev container,
-where clangd and pyright can see all of it. A host-side setup would have nothing
-to resolve against without replicating the whole toolchain locally.
-
-You need Zed 0.221 or newer and Podman. Add `"use_podman": true` to your Zed
-`settings.json` (the global one). Open this folder in Zed and accept the "open in
-dev container" prompt, or run "Project: Open Remote" from the command palette.
-Zed builds the image from the `Containerfile`, mounts the repo at `/work`, and
-runs the language servers inside it.
-
-Run `make soc` once first (from the host, or in the dev container's own terminal,
-the `Makefile` detects when it is already inside and skips Podman) so the
-generated headers exist; clangd needs them to resolve `<generated/csr.h>` and the
-CSR accessors. After that you get completion and go-to-definition across the
-firmware and into picolibc, LiteX libbase, and the Ibex CPU headers for C, and
-into the LiteX / litex_boards / migen sources for `tn9k_ibex.py`.
-
-The configuration is in `.devcontainer/devcontainer.json`, `.clangd`,
-`pyrightconfig.json`, and `.zed/settings.json`.
-
 ## Building the SoC (`make soc`)
 
 `make soc` runs this project's board target, `tn9k_ibex.py`, with the settings
-that work on this board. Three of them are non-obvious:
+that work on this board.
 
 - `MAIN_RAM_SIZE=0x2000` puts 8 KB of main RAM in BRAM. This one is required:
   dropping it brings up the on-board HyperRAM as main RAM, and that controller

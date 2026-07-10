@@ -15,8 +15,8 @@
 
 # ---- Configuration ---------------------------------------------------------
 
-CONTAINER ?= tn9k-ibex          # running container name
-IMAGE     ?= tn9k-ibex          # image tag built from the Containerfile
+CONTAINER ?= ibex-tang-nano-oss-cad         # running container name
+IMAGE     ?= ibex-tang-nano-oss-cad         # image tag built from the Containerfile
 BOARD     ?= tangnano9k         # openFPGALoader board
 TTY       ?= /dev/ttyUSB1       # UART console (interface B)
 
