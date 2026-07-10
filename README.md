@@ -34,7 +34,7 @@ the defaults live at the top of the `Makefile`.
 ## Building the SoC (`make soc`)
 
 `make soc` runs this project's board target, `tn9k_ibex.py`, with the settings
-that work on this board. Three of them are non-obvious:
+that work on this board.
 
 - `MAIN_RAM_SIZE=0x2000` puts 8 KB of main RAM in BRAM. This one is required:
   dropping it brings up the on-board HyperRAM as main RAM, and that controller
