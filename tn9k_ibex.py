@@ -17,16 +17,14 @@
 # subclasses the *patched* upstream BaseSoC, so it inherits the fpga register
 # file automatically.
 #
-# Build (from the repo root inside the container), same options as before:
-#   python3 tn9k_ibex.py --toolchain apicula --cpu-type ibex \
-#     --sys-clk-freq 13.5e6 --integrated-main-ram-size 0x2000 \
-#     --uart-baudrate 9600 --build
+# Build (from the repo root inside the container). The board's working values
+# are this target's own defaults, so no build flags are needed:
+#   python3 tn9k_ibex.py --build
 
-from litex.build.generic_platform import Pins, IOStandard
+from litex.build.generic_platform import IOStandard, Pins
+from litex.build.parser import LiteXArgumentParser
 from litex.soc.cores.gpio import GPIOOut
 from litex.soc.integration.builder import Builder
-from litex.build.parser import LiteXArgumentParser
-
 from litex_boards.platforms import sipeed_tang_nano_9k
 from litex_boards.targets.sipeed_tang_nano_9k import BaseSoC as _BaseSoC
 
@@ -38,37 +36,75 @@ class BaseSoC(_BaseSoC):
         # External LED on J6 pin 25: FPGA pin 25 -> resistor -> LED -> GND.
         # A dedicated GPIO output rather than a 7th on-board LED; the CPU drives
         # it through the ext_led_out CSR (ext_led_out_write(1) / (0)).
-        self.platform.add_extension([
-            ("ext_led", 0, Pins("25"), IOStandard("LVCMOS33")),
-        ])
+        self.platform.add_extension(
+            [
+                ("ext_led", 0, Pins("25"), IOStandard("LVCMOS33")),
+            ]
+        )
         self.ext_led = GPIOOut(self.platform.request("ext_led"))
 
         # Auto-boot a flash-resident app. After serialboot times out, the BIOS
         # copies the FBI image at this flash offset into Main RAM and runs it
         # (boot priority: serial=0, flash=10). Constant-only, no gateware cost.
-        self.add_constant("FLASH_BOOT_ADDRESS",
-                          self.bus.regions["spiflash"].origin + app_flash_offset)
+        self.add_constant(
+            "FLASH_BOOT_ADDRESS", self.bus.regions["spiflash"].origin + app_flash_offset
+        )
 
 
 def main():
-    parser = LiteXArgumentParser(platform=sipeed_tang_nano_9k.Platform,
-                                 description="LiteX SoC on Tang Nano 9K (Ibex).")
-    parser.add_target_argument("--flash",               action="store_true",      help="Flash bitstream.")
-    parser.add_target_argument("--sys-clk-freq",        default=27e6, type=float, help="System clock frequency.")
-    parser.add_target_argument("--bios-flash-offset",   default="0x0",            help="BIOS offset in SPI Flash.")
-    parser.add_target_argument("--app-flash-offset",    default="0x100000",       help="Flash-boot app offset in SPI Flash.")
-    parser.add_target_argument("--with-spi-sdcard",     action="store_true",      help="Enable SPI-mode SDCard support.")
-    parser.add_target_argument("--with-video-terminal", action="store_true",      help="Enable Video Terminal (HDMI).")
-    parser.add_target_argument("--prog-kit",            default="openfpgaloader", help="Programmer select from Gowin/openFPGALoader.")
+    parser = LiteXArgumentParser(
+        platform=sipeed_tang_nano_9k.Platform,
+        description="LiteX SoC on Tang Nano 9K (Ibex).",
+    )
+    parser.add_target_argument("--flash", action="store_true", help="Flash bitstream.")
+    parser.add_target_argument(
+        "--sys-clk-freq",
+        default=13.5e6,
+        type=float,
+        help="System clock frequency (27e6 does not boot on this board).",
+    )
+    parser.add_target_argument(
+        "--bios-flash-offset", default="0x0", help="BIOS offset in SPI Flash."
+    )
+    parser.add_target_argument(
+        "--app-flash-offset",
+        default="0x100000",
+        help="Flash-boot app offset in SPI Flash.",
+    )
+    parser.add_target_argument(
+        "--with-spi-sdcard", action="store_true", help="Enable SPI-mode SDCard support."
+    )
+    parser.add_target_argument(
+        "--with-video-terminal",
+        action="store_true",
+        help="Enable Video Terminal (HDMI).",
+    )
+    parser.add_target_argument(
+        "--prog-kit",
+        default="openfpgaloader",
+        help="Programmer select from Gowin/openFPGALoader.",
+    )
+
+    # Make the board's known-good values this target's defaults, so a bare
+    # `python3 tn9k_ibex.py --build` builds the working SoC. Each one replaces an
+    # upstream default that does not work here (see README "Building the SoC").
+    # Still overridable on the command line.
+    parser.set_defaults(
+        toolchain="apicula",
+        cpu_type="ibex",
+        integrated_main_ram_size=0x2000,
+        uart_baudrate=9600,
+    )
+
     args = parser.parse_args()
 
     soc = BaseSoC(
-        toolchain           = args.toolchain,
-        sys_clk_freq        = args.sys_clk_freq,
-        bios_flash_offset   = int(args.bios_flash_offset, 0),
-        app_flash_offset    = int(args.app_flash_offset, 0),
-        with_video_terminal = args.with_video_terminal,
-        **parser.soc_argdict
+        toolchain=args.toolchain,
+        sys_clk_freq=args.sys_clk_freq,
+        bios_flash_offset=int(args.bios_flash_offset, 0),
+        app_flash_offset=int(args.app_flash_offset, 0),
+        with_video_terminal=args.with_video_terminal,
+        **parser.soc_argdict,
     )
 
     if args.with_spi_sdcard:
@@ -86,7 +122,11 @@ def main():
         prog = soc.platform.create_programmer(kit=args.prog_kit)
         prog.flash(0, builder.get_bitstream_filename(mode="flash", ext=".fs"))
         if args.prog_kit == "openfpgaloader":
-            prog.flash(int(args.bios_flash_offset, 0), builder.get_bios_filename(), external=True)
+            prog.flash(
+                int(args.bios_flash_offset, 0),
+                builder.get_bios_filename(),
+                external=True,
+            )
 
 
 if __name__ == "__main__":

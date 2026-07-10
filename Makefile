@@ -17,17 +17,15 @@
 
 CONTAINER ?= ibex-tang-nano-oss-cad         # running container name
 IMAGE     ?= ibex-tang-nano-oss-cad         # image tag built from the Containerfile
-BOARD     ?= tangnano9k         # openFPGALoader board
-TTY       ?= /dev/ttyUSB1       # UART console (interface B)
+BOARD     ?= tangnano9k         			# openFPGALoader board
+TTY       ?= /dev/ttyUSB1       			# UART console (interface B)
 
 APP              ?= blink       # which app under apps/ to build/flash/run
 APP_FLASH_OFFSET ?= 0x100000    # where a flash-boot app lives in SPI flash
 
-# SoC build parameters (see README section 3 for why these values).
-TOOLCHAIN     ?= apicula
-CPU           ?= ibex
-SYS_CLK_FREQ  ?= 13.5e6
-MAIN_RAM_SIZE ?= 0x2000
+# Serial console speed. The SoC build parameters (clock, main RAM, baud, etc.)
+# are in tn9k_ibex.py, but litex_term still needs the baud here on the host side,
+# keep it matched to the target's uart_baudrate.
 BAUD          ?= 9600
 
 # Build artifacts.
@@ -68,9 +66,7 @@ shell: ## Open a shell in the container
 # ---- Build -----------------------------------------------------------------
 
 soc: ## Build the SoC gateware + BIOS
-	$(EXEC) 'cd /work && python3 tn9k_ibex.py \
-		--toolchain $(TOOLCHAIN) --cpu-type $(CPU) --sys-clk-freq $(SYS_CLK_FREQ) \
-		--integrated-main-ram-size $(MAIN_RAM_SIZE) --uart-baudrate $(BAUD) --build'
+	$(EXEC) 'cd /work && python3 tn9k_ibex.py --build'
 
 app: ## Build one app (APP=blink)
 	$(EXEC) 'cd /work && make -C apps APP=$(APP)'
@@ -101,10 +97,16 @@ flash-app: app ## Flash APP to SPI flash at APP_FLASH_OFFSET (for flash-boot)
 reset: ## Reload the board from flash
 	$(EXEC) 'openFPGALoader -b $(BOARD) -r'
 
-console: ## Open the serial console
+# litex_term only quits on a double Ctrl-C; a single Ctrl-C or a closed terminal
+# leaves it orphaned in the container, still holding the port. A later console
+# then hits "multiple access on port" and exits silently. Reap any stale one
+# first. The [l] bracket keeps pkill from matching its own command line.
+serial: ## Open the serial console
+	-$(EXEC) 'pkill -f "[l]itex_term"' 2>/dev/null; true
 	$(EXEC_IT) 'litex_term $(TTY) --speed $(BAUD)'
 
 run: app ## Serial-boot APP over the console (e.g. run APP=echo)
+	-$(EXEC) 'pkill -f "[l]itex_term"' 2>/dev/null; true
 	$(EXEC_IT) 'cd /work && litex_term $(TTY) --speed $(BAUD) \
 		--kernel=build/apps/$(APP)/$(APP).bin'
 

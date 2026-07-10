@@ -1,6 +1,31 @@
 {
-  "//": "Point pyright at the container's LiteX venv so imports of litex,",
-  "//2": "litex_boards, and migen (used by tn9k_ibex.py) resolve and navigate.",
+  // Point pyright at the container's LiteX venv so migen and other normally
+  // installed packages resolve. LiteX itself and litex_boards / litedram /
+  // litespi / pythondata-* are pip editable installs done with PEP 660
+  // import-hook .pth files (__editable___*_finder.py), which pyright cannot
+  // follow statically, so their imports fail without the extraPaths below.
+  // Each editable repo lives at /opt/litex/<repo> with its package one level
+  // in; that repo dir is the path root. Regenerate the list with:
+  //   for f in /opt/litex-venv/lib/python3.12/site-packages/__editable___*_finder.py; do
+  //     grep -oE "'/[^']+'" "$f" | tr -d "'"; done | xargs -n1 dirname | sort -u
   "venvPath": "/opt",
-  "venv": "litex-venv"
+  "venv": "litex-venv",
+  "extraPaths": [
+    "/opt/litex/litex",
+    "/opt/litex/litex-boards",
+    "/opt/litex/litedram",
+    "/opt/litex/liteeth",
+    "/opt/litex/litei2c",
+    "/opt/litex/liteiclink",
+    "/opt/litex/litejesd204b",
+    "/opt/litex/litepcie",
+    "/opt/litex/litesata",
+    "/opt/litex/litescope",
+    "/opt/litex/litesdcard",
+    "/opt/litex/litespi",
+    "/opt/litex/pythondata-cpu-ibex",
+    "/opt/litex/pythondata-misc-tapcfg",
+    "/opt/litex/pythondata-software-compiler_rt",
+    "/opt/litex/pythondata-software-picolibc"
+  ]
 }

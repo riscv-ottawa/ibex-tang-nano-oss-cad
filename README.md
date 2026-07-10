@@ -27,36 +27,31 @@ make blink            # build + flash the external-LED blink app; runs on reset
 make run APP=echo     # or serial-boot the UART echo + on-board-LED app
 ```
 
-`make help` lists all targets. Any setting is overridable on the command line,
-for example `make run APP=echo TTY=/dev/ttyUSB1` or `make soc SYS_CLK_FREQ=13.5e6`;
-the defaults live at the top of the `Makefile`.
+`make help` lists all targets. Runtime settings like `APP`, `TTY`, and `BAUD` are
+overridable on the command line, for example `make run APP=echo TTY=/dev/ttyUSB1`;
+their defaults live at the top of the `Makefile`. The SoC build parameters (clock,
+main RAM, baud) live in `tn9k_ibex.py` instead, as described below.
 
 ## Building the SoC (`make soc`)
 
-`make soc` runs this project's board target, `tn9k_ibex.py`, with the settings
-that work on this board.
+`make soc` runs this project's board target, `python3 tn9k_ibex.py --build`. The
+target sets the values that work on this board as its own defaults, so no build
+flags are needed; each one replaces an upstream default that does not work here.
+You can still override any of them on the command line, for example
+`python3 tn9k_ibex.py --sys-clk-freq 27e6 --build`.
 
-- `MAIN_RAM_SIZE=0x2000` puts 8 KB of main RAM in BRAM. This one is required:
-  dropping it brings up the on-board HyperRAM as main RAM, and that controller
-  fails memtest badly (256/256 bus errors, ~99.6% data corruption).
-- `BAUD=9600` is the serial baud that gives the least trouble. At 115200 the BIOS
-  receiver overran during a binary upload and every `serialboot` aborted with a
-  frame or CRC error; at 9600 the upload completes.
-- `SYS_CLK_FREQ=13.5e6` is what worked here. At 27 MHz the design does not boot at
-  all (the CPU is silent), not sure why.
+- `integrated_main_ram_size = 0x2000` puts 8 KB of main RAM in BRAM. This one is
+  required: the upstream default brings up the on-board HyperRAM as main RAM, and
+  that controller fails memtest badly (256/256 bus errors, ~99.6% data corruption).
+- `uart_baudrate = 9600` is the serial baud that gives the least trouble. At 115200
+  the BIOS receiver overran during a binary upload and every `serialboot` aborted
+  with a frame or CRC error; at 9600 the upload completes. `make console` and
+  `make run` read this baud from the `Makefile`'s `BAUD`, which must match it.
+- `sys_clk_freq = 13.5e6` is what worked here. At the upstream 27 MHz default the
+  design does not boot at all (the CPU is silent), not sure why.
 
 Synthesis runs yosys, then nextpnr-himbaechel places and routes, then `gowin_pack`
-writes the bitstream to `build/sipeed_tang_nano_9k/gateware/`. The design lands
-around 80% of the GW1NR-9's LUT4s, and nextpnr can fail placement right at that
-utilisation ("Unable to find legal placement for all cells"). It is seed-sensitive,
-so just re-run `make soc` and it places on a later attempt.
-
-`tn9k_ibex.py` subclasses the upstream litex-boards Tang Nano 9K SoC and adds the
-two board-level tweaks this project needs: an external LED GPIO on J6 pin 25, and
-`FLASH_BOOT_ADDRESS` for flash auto-boot (both covered under Apps below). Board
-configuration like that belongs in the target script; the patches applied in the
-`Containerfile` are only for upstream *source* fixes (Ibex-under-slang, the
-register file, the clock gate, the BIOS linker).
+writes the bitstream to `build/sipeed_tang_nano_9k/gateware/`.
 
 ## USB permissions (one-time host setup)
 
@@ -64,21 +59,6 @@ The board enumerates as two USB-serial ports: interface A is JTAG (used by
 openFPGALoader, often `/dev/ttyUSB0`) and interface B is the UART console (often
 `/dev/ttyUSB1`). Access is set by udev rules, and udev runs on the host, so this
 is a host change even though flashing happens from the container.
-
-The stock openFPGALoader rule grants access with a `uaccess` ACL for your
-logged-in user, which is enough host-side but does not survive into the rootless
-container that `make flash` uses, so the device ends up read-only there and
-openFPGALoader fails with `usb_open() failed: -4`. This repo ships a rule that
-sets `MODE="0666"` on the FT2232 instead, which works both host-side and from the
-container. Install it once:
-
-```bash
-sudo cp udev/99-tangnano9k.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
-```
-
-Confirm with `make detect`. See [docs/flashing-from-the-container.md](docs/flashing-from-the-container.md)
-for the full explanation of the namespace permission mismatch.
 
 ## Flashing (`make flash`)
 
@@ -121,69 +101,6 @@ out-of-tree, in `build/apps/<name>/` (`<name>.elf`, `.bin`, and the `.fbi`
 flash-boot image). Adding an app is just a new `apps/<name>/main.c`; the build
 picks it up automatically. An app can also drop in its own `crt0.S` (as
 `blink_irq` does) and the build uses it instead of the shared one.
-
-### Serial app: UART echo + on-board LED
-
-`apps/echo/main.c` prints once on boot, then echoes serial input and toggles the
-on-board LED on each keypress. `make run APP=echo` builds it and opens the console
-with the binary queued. At the `litex>` prompt (press the board's reset button to
-get a fresh one) run `serialboot`: the BIOS reaches "Booting from serial",
-litex_term sends the binary into the 8 KB BRAM main RAM, and the CPU jumps to it.
-Keep such binaries small, since main RAM is only 8 KB.
-
-### Flash app: external LED, runs on power-up
-
-`apps/blink/main.c` blinks an **external LED** with no host attached, straight from
-flash on power-up. Two pieces make that work, both in `tn9k_ibex.py` (no patches):
-
-- An external LED on **J6 pin 25**, added with `platform.add_extension()` and driven
-  by a dedicated `GPIOOut`. The CPU controls it through the `ext_led_out` CSR, so C
-  calls `ext_led_out_write(1)` / `ext_led_out_write(0)`. The on-board LEDs are
-  untouched.
-- `FLASH_BOOT_ADDRESS` at flash offset `0x100000`, added with `soc.add_constant()`.
-  The BIOS tries serialboot first, then flashboot: on a headless boot serialboot
-  times out and the BIOS copies the flash image into main RAM and runs it.
-
-Wire the LED to pin 25: FPGA pin 25 -> current-limiting resistor (~330R) -> LED
-anode, LED cathode -> GND. Then:
-
-```bash
-make blink            # builds apps/blink and flashes it to offset 0x100000
-```
-
-Power-cycle or `make reset` with nothing driving serial. Watch it with `make console`
-if you like: after serialboot times out the BIOS prints `Booting from flash...` and
-`Copying 0x00100000 to 0x40000000 ...`, jumps, and the external LED blinks. The
-on-board LEDs stay off; serial-booting the echo app still drives them as before.
-
-The `.fbi` image is `[length][crc32][payload]` with the header written little-endian
-(`crcfbigen -f -l`) to match this little-endian Ibex. If the console ever shows
-`Error: invalid image length` or `CRC failed`, the flashed image is wrong or stale;
-re-run `make blink` to rebuild and reflash.
-
-### Interrupt + timer version
-
-`apps/blink_irq/main.c` does the same thing as `blink`, but instead of a busy-loop
-it uses the timer. It programs `timer0` to count down from half a second and
-auto-reload, so it raises a periodic event that LiteX wires to a fast local
-interrupt on the Ibex. The interrupt service routine (`isr()`) clears the event,
-toggles the LED, and bumps a counter; `main()` watches that counter and prints
-`Toggling LED...` on each change, keeping the slow serial work out of the ISR.
-
-Enabling it is three calls in `main()`: set up `timer0`, unmask the timer IRQ with
-`irq_setmask()`, and enable interrupts globally with `irq_setie()`. This app ships
-its own `apps/blink_irq/crt0.S`, which points `mtvec` at a trap handler that saves
-the caller-saved registers, calls `isr()`, restores them, and returns with `mret`.
-It uses direct trap mode (one handler, dispatched in software off the pending mask)
-rather than a vectored table, which keeps the startup small and avoids the
-compressed-jump alignment pitfall a vector table has under the C extension.
-
-Build and flash it like the other flash-boot app:
-```bash
-make flash-app APP=blink_irq
-```
-Then `make reset` with `make console` open: you get the same blinking LED and
-`Toggling LED...` stream, now paced by the timer interrupt.
 
 ### Why the startup code is what it is
 
