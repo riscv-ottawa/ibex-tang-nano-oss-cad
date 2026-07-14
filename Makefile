@@ -97,16 +97,23 @@ flash-app: app ## Flash APP to SPI flash at APP_FLASH_OFFSET (for flash-boot)
 reset: ## Reload the board from flash
 	$(EXEC) 'openFPGALoader -b $(BOARD) -r'
 
+# Wake the FTDI UART so the first console after power-on isn't blank (see
+# scripts/prime_uart.py). Ignore failures: on a warm port it's a no-op, and we
+# don't want a missing device to block the console attempt.
+PRIME = -$(EXEC) 'cd /work && python3 scripts/prime_uart.py $(TTY) $(BAUD)' 2>/dev/null; true
+
 # litex_term only quits on a double Ctrl-C; a single Ctrl-C or a closed terminal
 # leaves it orphaned in the container, still holding the port. A later console
 # then hits "multiple access on port" and exits silently. Reap any stale one
 # first. The [l] bracket keeps pkill from matching its own command line.
 serial: ## Open the serial console
 	-$(EXEC) 'pkill -f "[l]itex_term"' 2>/dev/null; true
+	$(PRIME)
 	$(EXEC_IT) 'litex_term $(TTY) --speed $(BAUD)'
 
 run: app ## Serial-boot APP over the console (e.g. run APP=echo)
 	-$(EXEC) 'pkill -f "[l]itex_term"' 2>/dev/null; true
+	$(PRIME)
 	$(EXEC_IT) 'cd /work && litex_term $(TTY) --speed $(BAUD) \
 		--kernel=build/apps/$(APP)/$(APP).bin'
 
