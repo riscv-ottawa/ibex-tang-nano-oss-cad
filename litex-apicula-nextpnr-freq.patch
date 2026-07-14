@@ -1,0 +1,30 @@
+diff --git a/litex/build/gowin/apicula.py b/litex/build/gowin/apicula.py
+index d1a8bfb07..19d2f4509 100644
+--- a/litex/build/gowin/apicula.py
++++ b/litex/build/gowin/apicula.py
+@@ -24,6 +24,25 @@ class GowinApiculaToolchain(YosysNextPNRToolchain):
+         _build_cst(self.named_sc, self.named_pc, self.additional_cst_commands, self._build_name)
+         return (self._build_name + ".cst", "CST")
+ 
++    def build_timing_constraints(self, vns):
++        # nextpnr-himbaechel takes no SDC for the Gowin arch, so the only way to
++        # give it a timing target is --freq. Without it nextpnr falls back to its
++        # 12 MHz default (common/kernel/command.cc) and, together with the base
++        # toolchain default --timing-allow-fail, silently emits a bitstream that
++        # fails timing at the real sys_clk_freq (see LiteX #1866, #1719). Derive
++        # the target from the period constraints already collected through
++        # add_period_constraint, mirroring the Xilinx/CologneChip nextpnr flows.
++        max_freq = 0
++        for clk, [period, name] in sorted(self.clocks.items(), key=lambda x: x[0].duid):
++            freq = 1e3 / period # period in ns -> freq in MHz.
++            if freq > max_freq:
++                max_freq = freq
++
++        # FIXME: NextPNRWrapper is constructed at finalize level, too early
++        # to update self._pnr_opts. The solution is to update _nextpnr instance.
++        if max_freq > 0:
++            self._nextpnr._pnr_opts += f" --freq {round(max_freq, 3)}"
++
+     def finalize(self):
+         devicename = self.platform.devicename
+         # Non-exhaustive list of family aliases that Gowin IDE supports but don't have a unique database

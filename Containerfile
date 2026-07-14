@@ -73,6 +73,15 @@ RUN cd /opt/litex/litex \
     && git fetch origin fix-yosys-slang-ibex \
     && git checkout fix-yosys-slang-ibex
 
+# Pass the design's clock target to nextpnr on the open Apicula/Gowin flow. The
+# apicula toolchain never emitted --freq, so nextpnr-himbaechel placed against
+# its 12 MHz default with --timing-allow-fail on and silently shipped bitstreams
+# that fail timing at the real sys_clk_freq (LiteX #1866, #1719). The patch adds
+# build_timing_constraints, mirroring the Xilinx/CologneChip nextpnr flows.
+COPY litex-apicula-nextpnr-freq.patch /tmp/litex-apicula-nextpnr-freq.patch
+RUN cd /opt/litex/litex && git apply --verbose /tmp/litex-apicula-nextpnr-freq.patch \
+    && rm /tmp/litex-apicula-nextpnr-freq.patch
+
 # Opt the Tang Nano 9K target into the distributed-RAM register file so the SoC
 # fits the GW1NR-9; the default flip-flop file overflows its LUTs (106%).
 COPY litex-boards-tang-nano-regfile.patch /tmp/litex-boards-tang-nano-regfile.patch

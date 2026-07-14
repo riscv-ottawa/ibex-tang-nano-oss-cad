@@ -59,9 +59,14 @@ def main():
     parser.add_target_argument("--flash", action="store_true", help="Flash bitstream.")
     parser.add_target_argument(
         "--sys-clk-freq",
-        default=13.5e6,
+        default=24e6,
         type=float,
-        help="System clock frequency (27e6 does not boot on this board).",
+        help="System clock frequency. 24e6 is the reliable maximum for this "
+        "Ibex SoC on the GW1NR-9: the routed Fmax lands around 26-29 MHz "
+        "depending on placement, so 27e6 sits on the timing edge and is not "
+        "dependable. Reaching even this needs the apicula --freq fix in the "
+        "Containerfile; without it nextpnr places against its 12 MHz default "
+        "and silently ships a bitstream that fails timing (LiteX #1866, #1719).",
     )
     parser.add_target_argument(
         "--bios-flash-offset", default="0x0", help="BIOS offset in SPI Flash."
